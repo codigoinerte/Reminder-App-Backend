@@ -1,0 +1,36 @@
+# VirtualHost de Apache para el backend del WhatsApp Scheduler.
+#
+# Apache recibe el subdominio por HTTPS y hace de reverse proxy hacia el
+# contenedor del backend, que escucha SOLO en 127.0.0.1:7002.
+#
+#   https://reminderapp.tester.org.pe  ──►  127.0.0.1:7002  (Docker → backend:3000)
+#
+# Instalación en el VPS (ejemplo Ubuntu/Debian):
+#   1) Copia este archivo a:
+#        /etc/apache2/sites-available/reminderapp.conf
+#   2) Habilita los módulos de proxy:
+#        sudo a2enmod proxy proxy_http headers
+#   3) Habilita el sitio:
+#        sudo a2ensite reminderapp.conf
+#        sudo systemctl reload apache2
+#   4) Emite el certificado HTTPS con certbot (añade el bloque :443 solo):
+#        sudo certbot --apache -d reminderapp.tester.org.pe
+#
+# Tras certbot, este bloque :80 normalmente queda redirigiendo a :443 y certbot
+# crea un reminderapp-le-ssl.conf con el VirtualHost :443. El ProxyPass debe
+# quedar dentro del VirtualHost :443 (certbot suele copiarlo; si no, muévelo).
+
+<VirtualHost *:80>
+    ServerName reminderapp.tester.org.pe
+
+    # Reverse proxy hacia el backend en Docker (localhost del host, puerto 7002).
+    ProxyPreserveHost On
+    ProxyPass        /  http://127.0.0.1:7002/
+    ProxyPassReverse /  http://127.0.0.1:7002/
+
+    # Reenvía el esquema real al backend (útil si más adelante lo usa).
+    RequestHeader set X-Forwarded-Proto "https"
+
+    ErrorLog  ${APACHE_LOG_DIR}/reminderapp-error.log
+    CustomLog ${APACHE_LOG_DIR}/reminderapp-access.log combined
+</VirtualHost>

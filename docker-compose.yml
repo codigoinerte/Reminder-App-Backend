@@ -1,0 +1,98 @@
+# Despliegue de producción — WhatsApp Scheduler
+#
+# El reverse proxy + HTTPS lo maneja APACHE en el host (fuera de Docker).
+# Docker solo expone el backend en 127.0.0.1:3000 para que Apache lo alcance;
+# Evolution queda INTERNO (solo accesible por el backend en la red Docker).
+#
+# Servicios:
+#   - backend          Nuestra API + scheduler (Node/tsx). Usa Neon (nube)
+#                      para SUS datos; habla con evolution por la red interna.
+#                      Publicado SOLO en localhost → Apache hace de proxy.
+#   - evolution        Evolution API (WhatsApp). NO expuesto a internet.
+#                      Persiste sesiones en su propio Postgres + Redis.
+#   - evolution_db     Postgres dedicado a Evolution.
+#   - evolution_redis  Redis (cache de Evolution).
+#
+# Variables: copia .env.deploy.example a .env y complétala. compose lee ./.env.
+#
+# Arranque:  docker compose up -d --build
+# Migración: docker compose run --rm backend npm run migrate   (una vez)
+
+services:
+  backend:
+    build: .
+    restart: unless-stopped
+    # Publicado SOLO en localhost: Apache (en el host) lo alcanza por
+    # 127.0.0.1:7002 y hace de reverse proxy con HTTPS hacia
+    # https://reminderapp.tester.org.pe. No queda abierto a internet.
+    # Mapeo  host:contenedor = 7002:3000  (dentro del contenedor sigue siendo 3000).
+    ports:
+      - "127.0.0.1:7002:3000"
+    environment:
+      PORT: "3000"
+      # Neon (la pones en .env; NO se versiona).
+      DATABASE_URL: ${DATABASE_URL}
+      # Evolution dentro del compose se alcanza por su nombre de servicio.
+      EVOLUTION_BASE_URL: http://evolution:8080
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      EVOLUTION_INSTANCE_PREFIX: ${EVOLUTION_INSTANCE_PREFIX:-whatsapp-scheduler}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-30d}
+      CRON_EXPRESSION: ${CRON_EXPRESSION:-* * * * *}
+    depends_on:
+      - evolution
+
+  evolution:
+    image: atendai/evolution-api:v2.1.1
+    restart: unless-stopped
+    # INTERNO: sin 'ports', no se expone al host ni a internet. Solo el backend
+    # lo alcanza por la red interna de Docker (http://evolution:8080).
+    expose:
+      - "8080"
+    environment:
+      SERVER_TYPE: http
+      SERVER_PORT: "8080"
+      # Evolution se referencia a sí mismo por la red interna.
+      SERVER_URL: http://evolution:8080
+      # Autenticación de la API (la misma que usa el backend en EVOLUTION_API_KEY).
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      # Persistencia en Postgres dedicado.
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:${EVOLUTION_DB_PASSWORD}@evolution_db:5432/evolution
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      DATABASE_SAVE_DATA_CONTACTS: "false"
+      DATABASE_SAVE_DATA_CHATS: "false"
+      # Cache en Redis.
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://evolution_redis:6379/0
+      CACHE_REDIS_PREFIX_KEY: evolution
+      CACHE_LOCAL_ENABLED: "false"
+    volumes:
+      - evolution_instances:/evolution/instances
+    depends_on:
+      - evolution_db
+      - evolution_redis
+
+  evolution_db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: ${EVOLUTION_DB_PASSWORD}
+      POSTGRES_DB: evolution
+    volumes:
+      - evolution_pgdata:/var/lib/postgresql/data
+
+  evolution_redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - evolution_redisdata:/data
+
+volumes:
+  evolution_instances:
+  evolution_pgdata:
+  evolution_redisdata:

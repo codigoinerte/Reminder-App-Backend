@@ -60,11 +60,22 @@ services:
       DATABASE_ENABLED: "true"
       DATABASE_PROVIDER: postgresql
       DATABASE_CONNECTION_URI: postgresql://evolution:${EVOLUTION_DB_PASSWORD}@evolution_db:5432/evolution
+      # Minimizar lo que se persiste: solo la SESIÓN (instance), nada de
+      # mensajes, actualizaciones, contactos ni historial de chats.
       DATABASE_SAVE_DATA_INSTANCE: "true"
       DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
       DATABASE_SAVE_MESSAGE_UPDATE: "false"
       DATABASE_SAVE_DATA_CONTACTS: "false"
       DATABASE_SAVE_DATA_CHATS: "false"
+      # Sin almacenamiento de multimedia (S3/Minio). No subimos imágenes/audios.
+      S3_ENABLED: "false"
+      # Limpia al iniciar las instancias temporales / no autenticadas (QR nunca
+      # escaneado). NO usamos DEL_INSTANCE (borraría sesiones reales tras X min).
+      DEL_TEMP_INSTANCES: "true"
+      # Logs silenciosos en producción (evita llenar disco).
+      LOG_LEVEL: ERROR,WARN
+      LOG_COLOR: "false"
+      LOG_BAILEYS: error
       # Cache en Redis.
       CACHE_REDIS_ENABLED: "true"
       CACHE_REDIS_URI: redis://evolution_redis:6379/0

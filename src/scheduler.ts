@@ -3,7 +3,7 @@
  * los usuarios y envía cada uno por la instancia de Evolution de su dueño.
  */
 import cron from 'node-cron';
-import { config } from './config.js';
+import { config, normalizePhone } from './config.js';
 import * as repo from './repository.js';
 import * as users from './usersRepo.js';
 import * as evolution from './evolution.js';
@@ -47,7 +47,11 @@ export async function tick(now = new Date()): Promise<void> {
         console.error(`[scheduler] sin instancia para user ${s.userId}, omito "${s.title}"`);
       } else {
         try {
-          await evolution.sendText(instanceName, s.contactNumber, s.message);
+          // Red de seguridad: normalizamos el número aquí también, por si quedó
+          // guardado sin código de país (datos antiguos previos a la corrección
+          // en la ruta de creación). Sin el 51, Evolution responde exists:false.
+          const to = normalizePhone(s.contactNumber);
+          await evolution.sendText(instanceName, to, s.message);
           ok = true;
           console.log(`[scheduler] ✅ "${s.title}" -> ${s.contactNumber} (user ${s.userId})`);
         } catch (err) {

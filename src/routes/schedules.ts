@@ -5,6 +5,7 @@
 import { Router } from 'express';
 import * as repo from '../repository.js';
 import { requireAuth, type AuthedRequest } from '../auth.js';
+import { normalizePhone } from '../config.js';
 import type { ScheduleInput } from '../types.js';
 
 export const schedulesRouter = Router();
@@ -32,7 +33,9 @@ function toInput(body: any): ScheduleInput {
     title: String(body.title).trim(),
     message: String(body.message).trim(),
     contactName: String(body.contactName ?? '').trim(),
-    contactNumber: String(body.contactNumber).replace(/[^\d]/g, ''),
+    // Normaliza a formato internacional (51 + 9 dígitos en Perú). Sin el código
+    // de país Evolution responde exists:false y el envío falla.
+    contactNumber: normalizePhone(body.contactNumber),
     scheduleDate: new Date(body.scheduleDate).toISOString(),
     repeatType: body.repeatType ?? 'once',
     enabled: body.enabled ?? true,
@@ -53,7 +56,12 @@ schedulesRouter.post('/', async (req: AuthedRequest, res) => {
 schedulesRouter.put('/:id', async (req: AuthedRequest, res) => {
   const error = validate(req.body, true);
   if (error) return res.status(400).json({ error });
-  const updated = await repo.updateSchedule(req.userPhone!, String(req.params.id), req.body);
+  // Normaliza el número también al editar (mismo motivo que al crear).
+  const patch = { ...req.body };
+  if (patch.contactNumber != null) {
+    patch.contactNumber = normalizePhone(patch.contactNumber);
+  }
+  const updated = await repo.updateSchedule(req.userPhone!, String(req.params.id), patch);
   if (!updated) return res.status(404).json({ error: 'No encontrado' });
   res.json(updated);
 });

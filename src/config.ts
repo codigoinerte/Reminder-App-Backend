@@ -45,3 +45,18 @@ export const config = {
 export function instanceNameFor(phone: string): string {
   return `${config.evolution.instancePrefix}-${phone}`;
 }
+
+/**
+ * Normaliza un número al formato que espera WhatsApp/Evolution: solo dígitos y
+ * con código de país. Si llegan 9 dígitos (formato local de Perú), prefija 51.
+ *
+ * Ej: "+51 930 299 310" -> "51930299310" ; "930299310" -> "51930299310".
+ *
+ * Se usa tanto para la identidad del usuario (su propio número) como para el
+ * número de contacto de cada recordatorio: sin el código de país, Evolution
+ * responde `exists:false` y el envío falla.
+ */
+export function normalizePhone(raw: unknown): string {
+  const digits = String(raw ?? '').replace(/[^\d]/g, '');
+  return digits.length === 9 ? `51${digits}` : digits;
+}

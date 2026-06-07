@@ -14,15 +14,9 @@ import { Router } from 'express';
 import * as evolution from '../evolution.js';
 import * as users from '../usersRepo.js';
 import { hashPassword, verifyPassword, signToken } from '../auth.js';
-import { instanceNameFor } from '../config.js';
+import { instanceNameFor, normalizePhone } from '../config.js';
 
 export const authRouter = Router();
-
-/** Prefija 51 (Perú) si llegan solo 9 dígitos; normaliza a solo dígitos. */
-function normalizePeru(raw: unknown): string {
-  const digits = String(raw ?? '').replace(/[^\d]/g, '');
-  return digits.length === 9 ? `51${digits}` : digits;
-}
 
 function validNumber(n: string): boolean {
   return n.length >= 10 && n.length <= 15;
@@ -30,7 +24,7 @@ function validNumber(n: string): boolean {
 
 /** Paso 1: crear instancia del usuario y devolver el pairing code. */
 authRouter.post('/connect', async (req, res) => {
-  const phone = normalizePeru(req.body?.number);
+  const phone = normalizePhone(req.body?.number);
   if (!validNumber(phone)) {
     return res.status(400).json({ error: 'Número inválido' });
   }
@@ -61,7 +55,7 @@ authRouter.post('/connect', async (req, res) => {
  * Solo borramos si la instancia NO está 'open' (no tumbamos una sesión activa).
  */
 authRouter.post('/cancel', async (req, res) => {
-  const phone = normalizePeru(req.body?.number);
+  const phone = normalizePhone(req.body?.number);
   if (!validNumber(phone)) {
     return res.status(400).json({ error: 'Número inválido' });
   }
@@ -75,7 +69,7 @@ authRouter.post('/cancel', async (req, res) => {
 
 /** Estado de vinculación + si el usuario ya tiene contraseña (registrado). */
 authRouter.get('/state', async (req, res) => {
-  const phone = normalizePeru(req.query?.number);
+  const phone = normalizePhone(req.query?.number);
   if (!validNumber(phone)) {
     return res.status(400).json({ error: 'Número inválido' });
   }
@@ -87,7 +81,7 @@ authRouter.get('/state', async (req, res) => {
 
 /** Paso final del registro: fija la contraseña. Requiere instancia 'open'. */
 authRouter.post('/register', async (req, res) => {
-  const phone = normalizePeru(req.body?.number);
+  const phone = normalizePhone(req.body?.number);
   const password = String(req.body?.password ?? '');
   if (!validNumber(phone)) {
     return res.status(400).json({ error: 'Número inválido' });
@@ -117,7 +111,7 @@ authRouter.post('/register', async (req, res) => {
 
 /** Login con número + contraseña. */
 authRouter.post('/login', async (req, res) => {
-  const phone = normalizePeru(req.body?.number);
+  const phone = normalizePhone(req.body?.number);
   const password = String(req.body?.password ?? '');
   if (!validNumber(phone)) {
     return res.status(400).json({ error: 'Número inválido' });

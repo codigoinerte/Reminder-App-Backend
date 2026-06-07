@@ -52,6 +52,27 @@ authRouter.post('/connect', async (req, res) => {
   });
 });
 
+/**
+ * Cancelar la vinculación en curso: borra la instancia temporal en Evolution
+ * para que Baileys DEJE de reintentar conectarse de inmediato (en vez de
+ * esperar a DEL_TEMP_INSTANCES en el próximo restart).
+ *
+ * Sin auth a propósito: un usuario nuevo aún no tiene token cuando cancela.
+ * Solo borramos si la instancia NO está 'open' (no tumbamos una sesión activa).
+ */
+authRouter.post('/cancel', async (req, res) => {
+  const phone = normalizePeru(req.body?.number);
+  if (!validNumber(phone)) {
+    return res.status(400).json({ error: 'Número inválido' });
+  }
+  const instanceName = instanceNameFor(phone);
+  const state = await evolution.getConnectionState(instanceName);
+  if (state !== 'open') {
+    await evolution.deleteInstance(instanceName).catch(() => {});
+  }
+  res.json({ ok: true });
+});
+
 /** Estado de vinculación + si el usuario ya tiene contraseña (registrado). */
 authRouter.get('/state', async (req, res) => {
   const phone = normalizePeru(req.query?.number);

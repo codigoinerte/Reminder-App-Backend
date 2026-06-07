@@ -25,6 +25,30 @@ whatsappRouter.get('/status', async (req: AuthedRequest, res) => {
 });
 
 /**
+ * Lista los contactos de WhatsApp del usuario (de SU instancia). Solo personas,
+ * sin grupos. El número viene en formato internacional listo para enviar.
+ */
+whatsappRouter.get('/contacts', async (req: AuthedRequest, res) => {
+  const user = await users.getByPhone(req.userPhone!);
+  if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+  const state = await evolution.getConnectionState(user.instanceName);
+  if (state !== 'open') {
+    return res
+      .status(409)
+      .json({ error: 'WhatsApp no está conectado', state, contacts: [] });
+  }
+
+  try {
+    const contacts = await evolution.findContacts(user.instanceName);
+    res.json({ contacts });
+  } catch (err) {
+    console.error('[whatsapp/contacts] error:', err);
+    res.status(502).json({ error: 'No se pudieron obtener los contactos', contacts: [] });
+  }
+});
+
+/**
  * Reconecta WhatsApp del usuario autenticado: regenera el pairing code de su
  * instancia. Usado cuando la cuenta existe pero la instancia está 'close'.
  */

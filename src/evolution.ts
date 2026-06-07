@@ -117,6 +117,45 @@ export async function deleteInstance(instanceName: string): Promise<void> {
   });
 }
 
+export type WhatsAppContact = {
+  /** Número en formato internacional sin "+" ni sufijo, ej. "51999999999". */
+  number: string;
+  /** Nombre para mostrar (pushName del contacto). */
+  name: string;
+};
+
+/**
+ * Lista los contactos de WhatsApp sincronizados de la instancia. Requiere que
+ * Evolution tenga DATABASE_SAVE_DATA_CONTACTS=true y que la sesión haya
+ * sincronizado (al (re)conectar WhatsApp envía la lista inicial).
+ *
+ * Filtra SOLO personas: descarta grupos (@g.us / isGroup), el contacto oficial
+ * "WhatsApp" (0@s.whatsapp.net) y cualquier jid sin número usable. Mapea
+ * remoteJid -> número y ordena por nombre.
+ */
+export async function findContacts(
+  instanceName: string
+): Promise<WhatsAppContact[]> {
+  const raw = await evo<any>(
+    `/chat/findContacts/${encodeURIComponent(instanceName)}`,
+    { method: 'POST', body: '{}' }
+  );
+  const arr: any[] = Array.isArray(raw) ? raw : (raw?.contacts ?? raw?.data ?? []);
+
+  const contacts: WhatsAppContact[] = [];
+  for (const c of arr) {
+    const jid = String(c?.remoteJid ?? c?.id ?? '');
+    if (c?.isGroup || !jid.endsWith('@s.whatsapp.net')) continue;
+    const number = jid.slice(0, jid.indexOf('@'));
+    if (!number || number === '0' || number.length < 8) continue;
+    const name = String(c?.pushName ?? c?.name ?? c?.verifiedName ?? '').trim() || number;
+    contacts.push({ number, name });
+  }
+
+  contacts.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+  return contacts;
+}
+
 /** Envía un mensaje de texto. number en formato 51999999999 (sin + ni @). */
 export async function sendText(
   instanceName: string,

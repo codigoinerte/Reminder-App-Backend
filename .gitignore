@@ -1,7 +1,11 @@
 node_modules/
-.env
-.env.local
-.env.*-deploy
 dist/
 *.log
 *.apk
+
+# Secretos: ignoramos CUALQUIER .env (con claves reales) y dejamos pasar SOLO
+# los *.example (plantillas sin secretos). El patrón cubre variantes como
+# .env.local, .env.local-deploy, .env.local-deploy.backup, .env.prod, etc.
+.env
+.env.*
+!.env*.example

@@ -43,7 +43,9 @@ services:
       - evolution
 
   evolution:
-    image: atendai/evolution-api:v2.1.1
+    # Imagen mantenida (la antigua atendai/* quedó abandonada y su Baileys
+    # desfasado provoca "Connection Failure" sin generar el pairing code).
+    image: evoapicloud/evolution-api:v2.3.7
     restart: unless-stopped
     # INTERNO: sin 'ports', no se expone al host ni a internet. Solo el backend
     # lo alcanza por la red interna de Docker (http://evolution:8080).

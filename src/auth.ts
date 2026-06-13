@@ -6,7 +6,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import type { NextFunction, Request, Response } from 'express';
-import { config } from './config.js';
+import { config, JWT_ISSUER, JWT_AUDIENCE } from './config.js';
 
 const SALT_ROUNDS = 10;
 
@@ -23,7 +23,10 @@ export async function verifyPassword(
 
 export function signToken(phone: string): string {
   return jwt.sign({ sub: phone }, config.jwtSecret, {
+    algorithm: 'HS256',
     expiresIn: config.jwtExpiresIn,
+    issuer: JWT_ISSUER,
+    audience: JWT_AUDIENCE,
   } as jwt.SignOptions);
 }
 
@@ -44,7 +47,11 @@ export function requireAuth(
     return res.status(401).json({ error: 'No autenticado' });
   }
   try {
-    const payload = jwt.verify(token, config.jwtSecret) as { sub?: string };
+    const payload = jwt.verify(token, config.jwtSecret, {
+      algorithms: ['HS256'],
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    }) as { sub?: string };
     if (!payload.sub) throw new Error('token sin sub');
     req.userPhone = payload.sub;
     next();

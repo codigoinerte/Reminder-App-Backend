@@ -3,6 +3,9 @@
  */
 import 'dotenv/config';
 
+const PLACEHOLDER_SECRET = 'cambia_esto_por_un_valor_aleatorio_largo';
+const MIN_SECRET_LENGTH = 32;
+
 function required(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -12,6 +15,20 @@ function required(name: string): string {
   }
   return value;
 }
+
+function requiredSecret(name: string): string {
+  const value = required(name);
+  if (value === PLACEHOLDER_SECRET || value.length < MIN_SECRET_LENGTH) {
+    throw new Error(
+      `${name} es inseguro: debe tener al menos ${MIN_SECRET_LENGTH} caracteres y no puede ser el valor de ejemplo.`
+    );
+  }
+  return value;
+}
+
+/** Identificadores del JWT: issuer y audience. */
+export const JWT_ISSUER = 'whatsapp-scheduler';
+export const JWT_AUDIENCE = 'whatsapp-scheduler-app';
 
 export const config = {
   port: Number(process.env.PORT ?? 3000),
@@ -33,9 +50,9 @@ export const config = {
   },
 
   // Secreto para firmar los JWT de sesión.
-  jwtSecret: required('JWT_SECRET'),
+  jwtSecret: requiredSecret('JWT_SECRET'),
   // Duración del token de sesión.
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '30d',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
 
   // Cada cuánto corre el scheduler (cron). Por defecto cada minuto.
   cronExpression: process.env.CRON_EXPRESSION ?? '* * * * *',

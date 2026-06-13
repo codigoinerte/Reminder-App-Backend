@@ -15,6 +15,7 @@ import * as evolution from '../evolution.js';
 import * as users from '../usersRepo.js';
 import { hashPassword, verifyPassword, signToken } from '../auth.js';
 import { instanceNameFor, normalizePhone } from '../config.js';
+import { authLimiter, connectLimiter } from '../middleware/rateLimit.js';
 
 export const authRouter = Router();
 
@@ -23,7 +24,7 @@ function validNumber(n: string): boolean {
 }
 
 /** Paso 1: crear instancia del usuario y devolver el pairing code. */
-authRouter.post('/connect', async (req, res) => {
+authRouter.post('/connect', connectLimiter, async (req, res) => {
   const phone = normalizePhone(req.body?.number);
   if (!validNumber(phone)) {
     return res.status(400).json({ error: 'Número inválido' });
@@ -54,7 +55,7 @@ authRouter.post('/connect', async (req, res) => {
  * Sin auth a propósito: un usuario nuevo aún no tiene token cuando cancela.
  * Solo borramos si la instancia NO está 'open' (no tumbamos una sesión activa).
  */
-authRouter.post('/cancel', async (req, res) => {
+authRouter.post('/cancel', connectLimiter, async (req, res) => {
   const phone = normalizePhone(req.body?.number);
   if (!validNumber(phone)) {
     return res.status(400).json({ error: 'Número inválido' });
@@ -68,7 +69,7 @@ authRouter.post('/cancel', async (req, res) => {
 });
 
 /** Estado de vinculación + si el usuario ya tiene contraseña (registrado). */
-authRouter.get('/state', async (req, res) => {
+authRouter.get('/state', connectLimiter, async (req, res) => {
   const phone = normalizePhone(req.query?.number);
   if (!validNumber(phone)) {
     return res.status(400).json({ error: 'Número inválido' });
@@ -80,14 +81,14 @@ authRouter.get('/state', async (req, res) => {
 });
 
 /** Paso final del registro: fija la contraseña. Requiere instancia 'open'. */
-authRouter.post('/register', async (req, res) => {
+authRouter.post('/register', authLimiter, async (req, res) => {
   const phone = normalizePhone(req.body?.number);
   const password = String(req.body?.password ?? '');
   if (!validNumber(phone)) {
     return res.status(400).json({ error: 'Número inválido' });
   }
-  if (password.length < 4) {
-    return res.status(400).json({ error: 'La contraseña debe tener al menos 4 caracteres' });
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
   }
 
   const user = await users.getByPhone(phone);
@@ -110,7 +111,7 @@ authRouter.post('/register', async (req, res) => {
 });
 
 /** Login con número + contraseña. */
-authRouter.post('/login', async (req, res) => {
+authRouter.post('/login', authLimiter, async (req, res) => {
   const phone = normalizePhone(req.body?.number);
   const password = String(req.body?.password ?? '');
   if (!validNumber(phone)) {

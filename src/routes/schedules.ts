@@ -39,6 +39,10 @@ function toInput(body: any): ScheduleInput {
     scheduleDate: new Date(body.scheduleDate).toISOString(),
     repeatType: body.repeatType ?? 'once',
     enabled: body.enabled ?? true,
+    // Variantes opcionales (el repo las ignora si repeatType === 'once').
+    messageVariants: Array.isArray(body.messageVariants)
+      ? body.messageVariants.map((v: unknown) => String(v))
+      : undefined,
   };
 }
 

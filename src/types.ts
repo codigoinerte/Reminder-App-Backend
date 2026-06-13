@@ -17,6 +17,10 @@ export type Schedule = {
   repeatType: RepeatType;
   enabled: boolean;
   status: ScheduleStatus;
+  /** Textos alternativos (solo repetitivos). Pool junto con `message`. */
+  messageVariants: string[];
+  /** Índice del pool usado en el último envío (para no repetir). */
+  lastVariantIndex: number | null;
   lastSentAt: string | null;
   createdAt: string;
 };
@@ -32,6 +36,9 @@ export type ScheduleRow = {
   repeat_type: RepeatType;
   enabled: boolean;
   status: ScheduleStatus;
+  message_variants: string[] | null;
+  last_variant_index: number | null;
+  next_jitter_min: number | null;
   last_sent_at: string | Date | null;
   created_at: string | Date;
 };
@@ -51,6 +58,8 @@ export function rowToSchedule(r: ScheduleRow): Schedule {
     repeatType: r.repeat_type,
     enabled: r.enabled,
     status: r.status,
+    messageVariants: r.message_variants ?? [],
+    lastVariantIndex: r.last_variant_index,
     lastSentAt: toIso(r.last_sent_at),
     createdAt: toIso(r.created_at)!,
   };
@@ -64,4 +73,6 @@ export type ScheduleInput = {
   scheduleDate: string;
   repeatType: RepeatType;
   enabled: boolean;
+  /** Textos alternativos opcionales (solo se usan si repeatType ≠ 'once'). */
+  messageVariants?: string[];
 };

@@ -46,12 +46,28 @@ async function migrate() {
       repeat_type    TEXT NOT NULL DEFAULT 'once',
       enabled        BOOLEAN NOT NULL DEFAULT true,
       status         TEXT NOT NULL DEFAULT 'scheduled',
+      message_variants    TEXT[] NOT NULL DEFAULT '{}',
+      last_variant_index  INTEGER,
+      next_jitter_min     INTEGER NOT NULL DEFAULT 0,
       last_sent_at   TIMESTAMPTZ,
       created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `;
   // Para BD que ya tenía schedules sin user_id.
   await sql`ALTER TABLE schedules ADD COLUMN IF NOT EXISTS user_id TEXT NOT NULL DEFAULT '';`;
+
+  // --- Anti-baneo (solo aplica a recordatorios repetitivos) ---
+  // message_variants: textos alternativos; junto con `message` forman el pool
+  //   del que el scheduler elige uno al azar en cada envío para no repetir
+  //   siempre el mismo texto (huella de bot).
+  // last_variant_index: índice del pool usado en el último envío, para evitar
+  //   repetir la misma variante dos veces seguidas.
+  // next_jitter_min: desfase en minutos (p. ej. -7..+10) que se suma a la hora
+  //   ancla SOLO al decidir si ya toca enviar. La hora base (schedule_date) no
+  //   deriva: el jitter se recalcula tras cada envío y nunca se acumula.
+  await sql`ALTER TABLE schedules ADD COLUMN IF NOT EXISTS message_variants TEXT[] NOT NULL DEFAULT '{}';`;
+  await sql`ALTER TABLE schedules ADD COLUMN IF NOT EXISTS last_variant_index INTEGER;`;
+  await sql`ALTER TABLE schedules ADD COLUMN IF NOT EXISTS next_jitter_min INTEGER NOT NULL DEFAULT 0;`;
 
   // Índices: el scheduler busca por (enabled, status, fecha) entre TODOS los
   // usuarios; la app lista por user_id.
